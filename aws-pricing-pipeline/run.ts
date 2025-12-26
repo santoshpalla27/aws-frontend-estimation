@@ -14,6 +14,7 @@ import { EC2ServicePricing } from './schema/ec2.schema.js';
 import { S3ServicePricing } from './schema/s3.schema.js';
 import { LambdaServicePricing } from './schema/lambda.schema.js';
 import { VPCServicePricing } from './schema/vpc.schema.js';
+import { RDSServicePricing } from './schema/rds.schema.js';
 import { diffPricing, loadPreviousVersion, generateDiffReport, DiffResult } from './versioning/diff.js';
 import { getCurrentVersion, bumpVersion, createVersionDirectory, updateLatestPointer, writeVersionMetadata } from './versioning/bump.js';
 
@@ -81,6 +82,7 @@ async function main() {
             'AmazonS3': S3ServicePricing,
             'AWSLambda': LambdaServicePricing,
             'AmazonVPC': VPCServicePricing,
+            'AmazonRDS': RDSServicePricing,
         };
 
         for (const [code, data] of serviceDataMap.entries()) {

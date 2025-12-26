@@ -2,6 +2,7 @@ import { processEC2 } from '../services/ec2.js';
 import { processS3 } from '../services/s3.js';
 import { processLambda } from '../services/lambda.js';
 import { processVPC } from '../services/vpc.js';
+import { processRDS } from '../services/rds.js';
 
 /**
  * Service Registry
@@ -60,6 +61,13 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
         name: 'VPC',
         fetchUrl: `${AWS_PRICING_BASE}/AmazonVPC/current/index.json`,
         processor: processVPC,
+        enabled: true,
+    },
+    {
+        code: 'AmazonRDS',
+        name: 'RDS',
+        fetchUrl: `${AWS_PRICING_BASE}/AmazonRDS/current/index.json`,
+        processor: processRDS,
         enabled: true,
     },
 ];
