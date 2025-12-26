@@ -1,15 +1,22 @@
-import { getEnabledServices } from './services.js';
+import { getEnabledServices } from '../registry/service-registry.js';
 import { fetchAllServices } from './fetcher.js';
 
 /**
- * Main fetch orchestrator
- * Downloads all enabled services
+ * Fetch all enabled services from ServiceRegistry
+ * Returns array of successfully fetched service codes
  */
-export async function fetchAll(): Promise<void> {
-    const services = getEnabledServices();
+export async function fetchAll(): Promise<string[]> {
+    const enabledServices = getEnabledServices();
 
-    await fetchAllServices(
-        services.map(s => ({ code: s.code, url: s.url })),
-        5 // Concurrency
-    );
+    const servicesToFetch = enabledServices.map(s => ({
+        code: s.code,
+        name: s.name,
+        url: s.fetchUrl,
+        enabled: true,
+    }));
+
+    await fetchAllServices(servicesToFetch);
+
+    // Return codes of all enabled services (fetcher throws on failure)
+    return enabledServices.map(s => s.code);
 }

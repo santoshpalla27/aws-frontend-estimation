@@ -4,10 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { fetchAll } from './fetch/index.js';
-import { processEC2 } from './services/ec2.js';
-import { processS3 } from './services/s3.js';
-import { processLambda } from './services/lambda.js';
-import { processVPC } from './services/vpc.js';
+import { getEnabledServices } from './registry/service-registry.js';
+import { assertServiceParity } from './validate/parity.js';
 import { validatePricingData } from './validate/validate.js';
 import { EC2ServicePricing } from './schema/ec2.schema.js';
 import { S3ServicePricing } from './schema/s3.schema.js';
@@ -15,6 +13,8 @@ import { LambdaServicePricing } from './schema/lambda.schema.js';
 import { VPCServicePricing } from './schema/vpc.schema.js';
 import { diffPricing, loadPreviousVersion, generateDiffReport, DiffResult } from './versioning/diff.js';
 import { getCurrentVersion, bumpVersion, createVersionDirectory, updateLatestPointer, writeVersionMetadata } from './versioning/bump.js';
+
+type BumpType = 'major' | 'minor' | 'patch';
 
 /**
  * AWS Pricing Pipeline
@@ -30,37 +30,55 @@ async function main() {
     try {
         // Step 1: Fetch raw pricing data
         console.log(chalk.bold.yellow('\n[STEP 1/6] Fetching AWS pricing data...\n'));
-        await fetchAll();
+        const fetchedServices = await fetchAll();
+        console.log(chalk.green(`✓ Fetched ${fetchedServices.length} services: ${fetchedServices.join(', ')}\n`));
 
-        // Step 2: Process services
+        // Step 2: Process services from registry
         console.log(chalk.bold.yellow('\n[STEP 2/6] Processing services...\n'));
 
         const region = 'us-east-1';
+        const enabledServices = getEnabledServices();
+        const serviceDataMap = new Map<string, any>();
+        const processedServices: string[] = [];
 
-        const ec2Data = await processEC2(region);
-        const s3Data = await processS3(region);
-        const lambdaData = await processLambda(region);
-        const vpcData = await processVPC(region);
+        for (const service of enabledServices) {
+            const data = await service.processor(region);
+            serviceDataMap.set(service.code, data);
+            processedServices.push(service.code);
+        }
 
-        // Step 3: Validate
+        // Step 2.5: CRITICAL - Validate service parity
+        console.log(chalk.bold.yellow('\n[STEP 2.5/6] Validating service parity...\n'));
+        assertServiceParity(fetchedServices, processedServices);
+        console.log(chalk.green(`✓ Service parity validated: ${processedServices.length} services fetched and processed\n`));
+
+        // Step 3: Validate pricing data
         console.log(chalk.bold.yellow('\n[STEP 3/6] Validating pricing data...\n'));
 
-        validatePricingData(ec2Data, EC2ServicePricing, 'EC2');
-        validatePricingData(s3Data, S3ServicePricing, 'S3');
-        validatePricingData(lambdaData, LambdaServicePricing, 'Lambda');
-        validatePricingData(vpcData, VPCServicePricing, 'VPC');
+        const schemaMap: Record<string, any> = {
+            'AmazonEC2': EC2ServicePricing,
+            'AmazonS3': S3ServicePricing,
+            'AWSLambda': LambdaServicePricing,
+            'AmazonVPC': VPCServicePricing,
+        };
+
+        for (const [code, data] of serviceDataMap.entries()) {
+            const schema = schemaMap[code];
+            if (schema) {
+                const serviceName = enabledServices.find(s => s.code === code)?.name || code;
+                validatePricingData(data, schema, serviceName);
+            }
+        }
 
         // Step 4: Diff against previous version
         console.log(chalk.bold.yellow('\n[STEP 4/6] Computing diffs...\n'));
 
         const diffs: DiffResult[] = [];
 
-        const services = [
-            { name: 'ec2', data: ec2Data },
-            { name: 's3', data: s3Data },
-            { name: 'lambda', data: lambdaData },
-            { name: 'vpc', data: vpcData },
-        ];
+        const services = Array.from(serviceDataMap.entries()).map(([code, data]) => ({
+            name: enabledServices.find(s => s.code === code)?.name.toLowerCase() || code.toLowerCase(),
+            data,
+        }));
 
         for (const service of services) {
             const previous = loadPreviousVersion(service.name);
