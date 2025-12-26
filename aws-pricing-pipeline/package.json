@@ -1,0 +1,41 @@
+{
+    "name": "aws-pricing-pipeline",
+    "version": "1.0.0",
+    "description": "Deterministic, auditable AWS pricing pipeline for 50+ services",
+    "type": "module",
+    "main": "dist/run.js",
+    "scripts": {
+        "build": "tsc",
+        "update-pricing": "npm run build && node dist/run.js",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=integration",
+        "clean": "rimraf dist raw/* output/*",
+        "typecheck": "tsc --noEmit"
+    },
+    "keywords": [
+        "aws",
+        "pricing",
+        "pipeline",
+        "cost-estimation"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "zod": "^3.22.4",
+        "stream-json": "^1.8.0",
+        "axios": "^1.6.5",
+        "chalk": "^5.3.0",
+        "date-fns": "^3.0.6"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.6",
+        "@types/jest": "^29.5.11",
+        "typescript": "^5.3.3",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.1",
+        "rimraf": "^5.0.5"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}
