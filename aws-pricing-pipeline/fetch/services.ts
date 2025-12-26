@@ -308,11 +308,13 @@ export const SERVICES: ServiceDefinition[] = [
     },
 
     // Analytics
+    // Note: AmazonOpenSearchService returns 404 - AWS may have changed the service code
+    // Try AmazonES (Elasticsearch Service) instead, or check AWS pricing API documentation
     {
         code: 'AmazonOpenSearchService',
         name: 'OpenSearch',
         url: `${AWS_PRICING_BASE}/AmazonOpenSearchService/current/index.json`,
-        enabled: true,
+        enabled: false, // Disabled: Returns 404
     },
 
     // Backup & Disaster Recovery
