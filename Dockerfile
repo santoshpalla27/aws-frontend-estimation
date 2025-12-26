@@ -10,11 +10,11 @@ RUN npm ci --only=production
 COPY pricing-pipeline/ ./
 
 # Create output directory and run pricing pipeline
-RUN mkdir -p /app/output/aws/v1/services && \
+RUN mkdir -p /app/pricing-pipeline/output/aws/v1/services && \
     npm run update-pricing || \
     (echo "Pricing pipeline failed, creating placeholder files" && \
-    echo '{"service":"ec2","region":"us-east-1","currency":"USD","version":"v1","lastUpdated":"'$(date -Iseconds)'","instances":{}}' > /app/output/aws/v1/services/ec2.json && \
-    echo '{"service":"vpc","region":"us-east-1","currency":"USD","version":"v1","lastUpdated":"'$(date -Iseconds)'","components":{"nat_gateway":{"hourly":0.045,"data_processing_per_gb":0.045},"igw":{"data_transfer":{"tiers":[{"upTo":10240,"rate":0.09,"unit":"gb"},{"upTo":"Infinity","rate":0.05,"unit":"gb"}]}}}}' > /app/output/aws/v1/services/vpc.json)
+    echo '{"service":"ec2","region":"us-east-1","currency":"USD","version":"v1","lastUpdated":"'$(date -Iseconds)'","instances":{}}' > /app/pricing-pipeline/output/aws/v1/services/ec2.json && \
+    echo '{"service":"vpc","region":"us-east-1","currency":"USD","version":"v1","lastUpdated":"'$(date -Iseconds)'","components":{"nat_gateway":{"hourly":0.045,"data_processing_per_gb":0.045},"igw":{"data_transfer":{"tiers":[{"upTo":10240,"rate":0.09,"unit":"gb"},{"upTo":"Infinity","rate":0.05,"unit":"gb"}]}}}}' > /app/pricing-pipeline/output/aws/v1/services/vpc.json)
 
 # Frontend - Build Stage
 FROM node:20-alpine AS frontend-builder
