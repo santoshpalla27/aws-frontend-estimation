@@ -3,9 +3,6 @@ import path from 'path';
 import { Logger, Timer } from '../utils/logger.js';
 import { EC2ServicePricing } from '../schema/ec2.schema.js';
 import { SimpleRate } from '../schema/base.js';
-import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
-import { applySKUFilters, EC2_FILTERS } from '../normalize/filters.js';
-import { normalizeRegion } from '../normalize/common.js';
 
 /**
  * EC2 Pricing Processor
@@ -30,7 +27,6 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
     Logger.data('File size', `${(stats.size / 1024 / 1024).toFixed(2)} MB`);
 
     const instances: Record<string, SimpleRate> = {};
-    const ebsPricing: Record<string, SimpleRate> = {};
 
     Logger.warn('EC2 file is too large (7+ GB). Using fallback pricing data.');
     Logger.info('For production use, consider pre-processing EC2 data or using AWS Price List API directly.');
