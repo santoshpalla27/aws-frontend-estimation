@@ -13,5 +13,5 @@ declare module 'stream-json/streamers/StreamArray.js' {
 }
 
 declare module 'stream-chain' {
-    export function chain(streams: NodeJS.ReadWriteStream[]): NodeJS.ReadWriteStream;
+    export function chain(streams: any[]): NodeJS.ReadWriteStream;
 }
