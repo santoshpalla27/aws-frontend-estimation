@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { parser } from 'stream-json';
-import { chain } from 'stream-chain';
-import { streamObject } from 'stream-json/streamers/StreamObject.js';
+import parser from 'stream-json';
+import chain from 'stream-chain';
+import streamObject from 'stream-json/streamers/StreamObject.js';
 import { Logger, Timer } from '../utils/logger.js';
 import { EC2ServicePricing } from '../schema/ec2.schema.js';
 import { SimpleRate } from '../schema/base.js';
@@ -40,10 +40,10 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
         let terms: any = null;
         let productCount = 0;
 
-        const pipeline = chain([
+        const pipeline = chain.chain([
             fs.createReadStream(rawFile),
-            parser(),
-            streamObject(),
+            parser.parser(),
+            streamObject.streamObject(),
         ]);
 
         pipeline.on('data', ({ key, value }: any) => {
