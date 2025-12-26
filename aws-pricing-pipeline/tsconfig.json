@@ -23,7 +23,11 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "allowUnusedLabels": false,
-        "allowUnreachableCode": false
+        "allowUnreachableCode": false,
+        "typeRoots": [
+            "./node_modules/@types",
+            "./types"
+        ]
     },
     "include": [
         "**/*.ts"
