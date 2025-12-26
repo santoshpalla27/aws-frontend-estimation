@@ -1,5 +1,3 @@
-import { parseAwsPrice } from './units.js';
-
 /**
  * Normalize AWS region codes
  * AWS uses inconsistent region naming

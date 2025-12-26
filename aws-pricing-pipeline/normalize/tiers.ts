@@ -10,48 +10,6 @@ import { parseAwsPrice } from './units.js';
  * - "Up to 1 million requests"
  */
 
-interface TierRange {
-    start: number;
-    end: number | 'Infinity';
-    rate: number;
-}
-
-/**
- * Parse AWS tier description to numeric range
- */
-function parseTierDescription(description: string): { boundary: number | null; isInfinity: boolean } {
-    const desc = description.toLowerCase().trim();
-
-    // "Over X" or "Greater than X" -> Infinity tier
-    if (desc.includes('over') || desc.includes('greater than')) {
-        return { boundary: null, isInfinity: true };
-    }
-
-    // Extract numeric value
-    const match = desc.match(/(\d+(?:\.\d+)?)\s*(tb|gb|mb|million|thousand|billion)?/i);
-    if (!match) {
-        throw new Error(`[TIER PARSING FAILED] Cannot parse tier description: "${description}"`);
-    }
-
-    let value = parseFloat(match[1]!);
-    const unit = match[2]?.toLowerCase();
-
-    // Convert to base units (GB for storage, raw number for requests)
-    if (unit === 'tb') {
-        value *= 1024; // TB to GB
-    } else if (unit === 'mb') {
-        value /= 1024; // MB to GB
-    } else if (unit === 'million') {
-        value *= 1_000_000;
-    } else if (unit === 'billion') {
-        value *= 1_000_000_000;
-    } else if (unit === 'thousand') {
-        value *= 1_000;
-    }
-
-    return { boundary: value, isInfinity: false };
-}
-
 /**
  * Expand AWS implicit tiers to explicit tier array
  * 
@@ -104,7 +62,6 @@ export function expandTiers(
     // Validate tier continuity
     for (let i = 0; i < tiers.length - 1; i++) {
         const current = tiers[i]!;
-        const next = tiers[i + 1]!;
 
         if (current.upTo === 'Infinity') {
             throw new Error(`[TIER EXPANSION FAILED] Infinity tier must be last, found at index ${i}`);

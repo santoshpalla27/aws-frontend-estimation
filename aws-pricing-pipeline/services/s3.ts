@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { S3ServicePricing } from '../schema/s3.schema.js';
-import { SimpleRate, PricingTier } from '../schema/base.js';
 import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
 import { normalizeRegion } from '../normalize/common.js';
 

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { VPCServicePricing } from '../schema/vpc.schema.js';
-import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
+import { parseAwsPrice } from '../normalize/units.js';
 
 /**
  * VPC Pricing Processor

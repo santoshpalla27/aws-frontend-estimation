@@ -1,14 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { Chain } from 'stream-chain';
-import { parser } from 'stream-json';
-import { streamArray } from 'stream-json/streamers/StreamArray.js';
-import chalk from 'chalk';
 import { Logger, Timer } from '../utils/logger.js';
 import { EC2ServicePricing } from '../schema/ec2.schema.js';
-import { SimpleRate, PricingTier } from '../schema/base.js';
+import { SimpleRate } from '../schema/base.js';
 import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
-import { expandTiers } from '../normalize/tiers.js';
 import { applySKUFilters, EC2_FILTERS } from '../normalize/filters.js';
 import { normalizeRegion } from '../normalize/common.js';
 
@@ -55,7 +50,6 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
 
     const instances: Record<string, SimpleRate> = {};
     const ebsPricing: any = {};
-    const dataTransferTiers: PricingTier[] = [];
 
     // Process products
     for (const [sku, product] of Object.entries(rawData.products)) {

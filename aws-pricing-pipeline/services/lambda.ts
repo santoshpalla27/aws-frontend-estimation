@@ -2,8 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { LambdaServicePricing } from '../schema/lambda.schema.js';
-import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
-import { applySKUFilters, LAMBDA_FILTERS } from '../normalize/filters.js';
+import { parseAwsPrice } from '../normalize/units.js';
 
 /**
  * Lambda Pricing Processor
