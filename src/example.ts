@@ -5,7 +5,7 @@
 
 import { ArchitectureGraph } from "./engine/architecture/graph";
 import { CostCalculator } from "./engine/calculator/engine";
-import { DEFAULT_CONTEXT } from "./core/types";
+import { DEFAULT_CONTEXT, CostLineItem } from "./core/types";
 import { EC2Plugin } from "./services/aws/ec2/plugin";
 import { VPCPlugin } from "./services/aws/vpc/plugin";
 import { pricingLoader } from "./engine/pricing/loader";
