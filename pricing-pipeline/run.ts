@@ -1,118 +1,81 @@
 /**
- * Main pipeline runner
- * Orchestrates the entire pricing update process
+ * Main Pipeline Runner
+ * Orchestrates the entire pricing pipeline
  */
 
 import { fetchEC2Pricing } from "./fetch/ec2.js";
-import { fetchVPCPricing } from "./fetch/vpc.js";
-import { processEC2Pricing, saveEC2Pricing } from "./services/ec2.js";
-import { processVPCPricing, saveVPCPricing } from "./services/vpc.js";
-import { validatePricingSchema, validatePricingValues } from "./validate/schema.js";
-import { runAllAssertions } from "./validate/assertions.js";
+import { processEC2Pricing } from "./services/ec2.js";
+import { validateEC2Pricing } from "./validate/schema.js";
+import * as fs from "fs";
+import * as path from "path";
 
-async function processService(
-    serviceName: string,
-    fetchFn: () => Promise<void>,
-    processFn: (region: string) => any,
-    saveFn: (pricing: any) => string
-) {
-    console.log("=".repeat(60));
-    console.log(`AWS Pricing Pipeline - ${serviceName.toUpperCase()}`);
-    console.log("=".repeat(60));
-    console.log();
+function formatDuration(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
 
-    try {
-        // Step 1: Fetch raw pricing
-        console.log(`Step 1: Fetching raw ${serviceName} pricing...`);
-        await fetchFn();
-        console.log();
-
-        // Step 2: Process and normalize
-        console.log(`Step 2: Processing ${serviceName} pricing...`);
-        const pricing = processFn("us-east-1");
-        console.log();
-
-        // Step 3: Validate schema
-        console.log("Step 3: Validating pricing schema...");
-        validatePricingSchema(pricing);
-        console.log("  ✓ Schema validation passed");
-        console.log();
-
-        // Step 4: Validate values
-        console.log("Step 4: Validating pricing values...");
-        validatePricingValues(pricing);
-        console.log("  ✓ Value validation passed");
-        console.log();
-
-        // Step 5: Run assertions
-        console.log("Step 5: Running assertions...");
-        runAllAssertions(pricing);
-        console.log();
-
-        // Step 6: Save output
-        console.log("Step 6: Saving pricing data...");
-        const outputFile = saveFn(pricing);
-        console.log();
-
-        // Summary
-        console.log("=".repeat(60));
-        console.log(`✓ ${serviceName.toUpperCase()} pipeline completed successfully`);
-        console.log(`  Output: ${outputFile}`);
-        console.log("=".repeat(60));
-        console.log();
-
-        return pricing;
-    } catch (error) {
-        console.error();
-        console.error("=".repeat(60));
-        console.error(`✗ ${serviceName.toUpperCase()} pipeline failed`);
-        console.error("=".repeat(60));
-
-        if (error instanceof Error) {
-            console.error(`Error: ${error.message}`);
-        } else {
-            console.error(error);
-        }
-
-        throw error;
+    if (minutes > 0) {
+        return `${minutes}m ${remainingSeconds}s`;
     }
+    return `${seconds}s`;
 }
 
 async function main() {
-    console.log("\n");
-    console.log("╔" + "═".repeat(58) + "╗");
-    console.log("║" + " ".repeat(10) + "AWS PRICING PIPELINE" + " ".repeat(28) + "║");
-    console.log("╚" + "═".repeat(58) + "╝");
-    console.log("\n");
+    console.log("╔════════════════════════════════════════╗");
+    console.log("║   AWS Pricing Pipeline - EC2 v1.0      ║");
+    console.log("╚════════════════════════════════════════╝\n");
+
+    const pipelineStart = Date.now();
 
     try {
-        // Process EC2
-        const ec2Pricing = await processService(
-            "EC2",
-            fetchEC2Pricing,
-            processEC2Pricing,
-            saveEC2Pricing
-        );
+        // Step 1: Fetch raw pricing data
+        console.log("📥 Step 1: Fetching raw pricing data");
+        console.log("─".repeat(50));
+        const fetchStart = Date.now();
+        await fetchEC2Pricing();
+        const fetchDuration = Date.now() - fetchStart;
+        console.log(`⏱️  Fetch completed in ${formatDuration(fetchDuration)}\n`);
 
-        // Process VPC
-        const vpcPricing = await processService(
-            "VPC",
-            fetchVPCPricing,
-            processVPCPricing,
-            saveVPCPricing
-        );
+        // Step 2: Process and normalize
+        console.log("⚙️  Step 2: Processing and normalizing");
+        console.log("─".repeat(50));
+        const processStart = Date.now();
+        processEC2Pricing("us-east-1");
+        const processDuration = Date.now() - processStart;
+        console.log(`⏱️  Processing completed in ${formatDuration(processDuration)}\n`);
 
-        // Final summary
-        console.log("\n");
-        console.log("╔" + "═".repeat(58) + "╗");
-        console.log("║" + " ".repeat(15) + "PIPELINE COMPLETE" + " ".repeat(26) + "║");
-        console.log("╠" + "═".repeat(58) + "╣");
-        console.log(`║  EC2 Instances: ${Object.keys(ec2Pricing.instances).length.toString().padEnd(43)} ║`);
-        console.log(`║  VPC Components: NAT Gateway, IGW${" ".repeat(24)} ║`);
-        console.log("╚" + "═".repeat(58) + "╝");
-        console.log("\n");
+        // Step 3: Validate output
+        console.log("✅ Step 3: Validating output");
+        console.log("─".repeat(50));
+        const validateStart = Date.now();
+        const outputPath = path.join(
+            process.cwd(),
+            "output",
+            "aws",
+            "v1",
+            "services",
+            "ec2.json"
+        );
+        const output = JSON.parse(fs.readFileSync(outputPath, "utf-8"));
+        validateEC2Pricing(output);
+        const validateDuration = Date.now() - validateStart;
+        console.log(`⏱️  Validation completed in ${formatDuration(validateDuration)}\n`);
+
+        // Summary
+        const totalDuration = Date.now() - pipelineStart;
+        console.log("═".repeat(50));
+        console.log("🎉 Pipeline completed successfully!");
+        console.log(`⏱️  Total time: ${formatDuration(totalDuration)}`);
+        console.log("═".repeat(50));
+        console.log(`\n📄 Output: ${outputPath}`);
+        console.log("\n📋 Next steps:");
+        console.log("  1. Review the output file");
+        console.log("  2. Compare against AWS calculator");
+        console.log("  3. Commit to version control");
 
     } catch (error) {
+        console.error("\n❌ Pipeline failed:");
+        console.error(error);
         process.exit(1);
     }
 }

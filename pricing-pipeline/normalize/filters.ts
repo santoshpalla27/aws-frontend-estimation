@@ -1,81 +1,69 @@
 /**
- * SKU filtering for AWS pricing
- * Only include on-demand, Linux, shared tenancy instances
+ * SKU Filtering
+ * Filters AWS pricing data to only include supported configurations
  */
 
 /**
- * Filter EC2 SKUs to only include relevant configurations
+ * EC2 SKU Filter
+ * Only on-demand, Linux, shared tenancy, no pre-installed software
  */
-export function isValidEC2SKU(attributes: any): boolean {
-    // Must be on-demand (filter out reserved, spot)
-    // Must be Linux
-    // Must be shared tenancy
-    // Must not have pre-installed software
-    // Must not require special licensing
-
+export function isValidEC2SKU(attrs: any): boolean {
     return (
-        attributes.operatingSystem === "Linux" &&
-        attributes.tenancy === "Shared" &&
-        attributes.preInstalledSw === "NA" &&
-        attributes.licenseModel === "No License required" &&
-        attributes.capacitystatus === "Used" // Actual capacity, not AllocatedHost
+        attrs.operatingSystem === "Linux" &&
+        attrs.tenancy === "Shared" &&
+        attrs.preInstalledSw === "NA" &&
+        attrs.licenseModel === "No License required" &&
+        attrs.capacitystatus === "Used" && // On-demand only
+        !attrs.instanceType?.includes("metal") // Exclude bare metal for now
     );
 }
 
 /**
- * Filter VPC SKUs
+ * VPC SKU Filter
+ * NAT Gateway, Internet Gateway, VPC Endpoints
  */
-export function isValidVPCSKU(attributes: any): boolean {
-    // Include NAT Gateway, VPC endpoints, etc.
-    // Exclude reserved capacity
-
+export function isValidVPCSKU(attrs: any): boolean {
     const validGroups = [
+        "NAT Gateway",
         "VpcEndpoint",
-        "NatGateway",
-        "VPN Connection",
-        "PrivateLink",
+        "InternetGateway",
+        "VPN Connection"
     ];
 
-    return (
-        attributes.group &&
-        validGroups.some(group => attributes.group.includes(group))
+    return validGroups.some(group =>
+        attrs.group?.includes(group) || attrs.productFamily?.includes(group)
     );
 }
 
 /**
- * Filter S3 SKUs
+ * S3 SKU Filter
+ * Standard storage, requests, data transfer
  */
-export function isValidS3SKU(attributes: any): boolean {
-    // Include standard storage classes
-    // Exclude Glacier, Intelligent-Tiering for now
-
-    const validStorageClasses = [
-        "General Purpose",
-        "Infrequent Access",
+export function isValidS3SKU(attrs: any): boolean {
+    // Exclude Glacier, Intelligent Tiering for initial implementation
+    const excludedStorageClasses = [
+        "Glacier",
+        "Deep Archive",
+        "Intelligent-Tiering"
     ];
 
-    return (
-        attributes.storageClass &&
-        validStorageClasses.some(sc => attributes.storageClass.includes(sc))
+    const storageClass = attrs.storageClass || "";
+    const isExcluded = excludedStorageClasses.some(excluded =>
+        storageClass.includes(excluded)
     );
+
+    return !isExcluded;
 }
 
 /**
- * Check if region is supported
+ * Generic filter for unsupported regions
  */
-export function isSupportedRegion(location: string): boolean {
-    const supportedRegions = [
-        "US East (N. Virginia)",
-        "US East (Ohio)",
-        "US West (N. California)",
-        "US West (Oregon)",
-        "Europe (Ireland)",
-        "Europe (London)",
-        "Europe (Frankfurt)",
-        "Asia Pacific (Tokyo)",
-        "Asia Pacific (Singapore)",
-        "Asia Pacific (Sydney)",
+export function isValidRegion(region: string): boolean {
+    const excludedRegions = [
+        "us-gov-",      // GovCloud
+        "cn-",          // China
+        "ap-northeast-3" // Osaka (limited availability)
     ];
 
-    return supportedRegions.includes(location);
+    return !excludedRegions.some(excluded => region.startsWith(excluded));
 }

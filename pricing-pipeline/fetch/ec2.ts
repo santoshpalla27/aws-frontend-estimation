@@ -1,82 +1,114 @@
 /**
  * EC2 Pricing Fetcher
  * Downloads raw AWS EC2 pricing data from public API
- * Uses streaming to handle large files efficiently
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import { pipeline } from "stream/promises";
-import { Readable } from "stream";
 
-const EC2_PRICING_URL =
-    "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json";
-
+const EC2_PRICING_URL = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json";
 const RAW_DIR = path.join(process.cwd(), "raw");
-const EC2_RAW_FILE = path.join(RAW_DIR, "ec2.json");
+const OUTPUT_FILE = path.join(RAW_DIR, "ec2.json");
 
 /**
- * Ensure raw directory exists
+ * Format bytes to human readable
  */
-function ensureRawDir(): void {
-    if (!fs.existsSync(RAW_DIR)) {
-        fs.mkdirSync(RAW_DIR, { recursive: true });
-    }
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 /**
- * Download EC2 pricing data with streaming to handle large files
+ * Create a simple progress bar
+ */
+function createProgressBar(current: number, total: number, width: number = 40): string {
+    const percentage = Math.min(100, Math.floor((current / total) * 100));
+    const filled = Math.floor((current / total) * width);
+    const empty = width - filled;
+
+    const bar = '█'.repeat(filled) + '░'.repeat(empty);
+    return `[${bar}] ${percentage}% (${formatBytes(current)} / ${formatBytes(total)})`;
+}
+
+/**
+ * Fetch EC2 pricing data with progress tracking and streaming write
+ * Downloads to raw/ directory without loading entire file into memory
  */
 export async function fetchEC2Pricing(): Promise<void> {
-    console.log("Fetching EC2 pricing data...");
-    console.log(`URL: ${EC2_PRICING_URL}`);
+    console.log("⏳ Starting download...");
+    console.log("⚠️  Note: AWS pricing files can be very large (up to 7GB)\n");
 
-    ensureRawDir();
+    // Ensure raw directory exists
+    if (!fs.existsSync(RAW_DIR)) {
+        fs.mkdirSync(RAW_DIR, { recursive: true });
+    }
 
     try {
         const response = await fetch(EC2_PRICING_URL);
 
         if (!response.ok) {
             throw new Error(
-                `HTTP ${response.status}: ${response.statusText}`
+                `Failed to fetch EC2 pricing: ${response.status} ${response.statusText}`
             );
         }
+
+        // Get content length for progress tracking
+        const contentLength = parseInt(response.headers.get('content-length') || '0');
 
         if (!response.body) {
             throw new Error("Response body is null");
         }
 
-        // Stream to file to avoid loading entire file in memory
-        const fileStream = fs.createWriteStream(EC2_RAW_FILE);
+        console.log(`📦 Total size: ${formatBytes(contentLength)}\n`);
 
-        // Convert web stream to Node stream
-        const nodeStream = Readable.fromWeb(response.body as any);
+        // Create write stream for direct file writing
+        const writeStream = fs.createWriteStream(OUTPUT_FILE);
 
-        await pipeline(nodeStream, fileStream);
+        // Stream the response directly to file with progress tracking
+        const reader = response.body.getReader();
+        let receivedLength = 0;
+        let lastProgressUpdate = 0;
 
-        const stats = fs.statSync(EC2_RAW_FILE);
-        const sizeInMB = (stats.size / 1024 / 1024).toFixed(2);
+        while (true) {
+            const { done, value } = await reader.read();
 
-        console.log(`✓ EC2 pricing downloaded: ${sizeInMB} MB`);
-        console.log(`✓ Saved to: ${EC2_RAW_FILE}`);
-    } catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to fetch EC2 pricing: ${error.message}`);
+            if (done) break;
+
+            // Write chunk directly to file
+            writeStream.write(value);
+            receivedLength += value.length;
+
+            // Update progress every 50MB
+            const progressDelta = receivedLength - lastProgressUpdate;
+            if (progressDelta >= 50 * 1024 * 1024) {
+                process.stdout.write('\r' + createProgressBar(receivedLength, contentLength));
+                lastProgressUpdate = receivedLength;
+            }
         }
+
+        // Final progress update
+        process.stdout.write('\r' + createProgressBar(receivedLength, contentLength) + '\n\n');
+
+        // Close the write stream
+        await new Promise<void>((resolve, reject) => {
+            writeStream.end(() => {
+                resolve();
+            });
+            writeStream.on('error', reject);
+        });
+
+        const sizeInGB = (receivedLength / 1024 / 1024 / 1024).toFixed(2);
+        console.log(`✓ Downloaded EC2 pricing data (${sizeInGB} GB)`);
+        console.log(`✓ Saved to: ${OUTPUT_FILE}`);
+        console.log(`⚠️  Processing will use streaming parser (2-pass algorithm)...\n`);
+
+    } catch (error) {
+        // FAIL LOUDLY on network errors
+        console.error("\n✗ Failed to fetch EC2 pricing:");
+        console.error(error);
         throw error;
     }
-}
-
-/**
- * Load raw EC2 pricing from disk
- */
-export function loadRawEC2Pricing(): any {
-    if (!fs.existsSync(EC2_RAW_FILE)) {
-        throw new Error(
-            `Raw EC2 pricing not found. Run fetchEC2Pricing() first.`
-        );
-    }
-
-    const data = fs.readFileSync(EC2_RAW_FILE, "utf-8");
-    return JSON.parse(data);
 }

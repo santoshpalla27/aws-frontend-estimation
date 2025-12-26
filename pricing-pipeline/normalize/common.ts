@@ -1,31 +1,26 @@
 /**
- * Common utilities for pricing normalization
+ * Common Normalization Utilities
  */
 
-export interface RawAWSPricing {
-    formatVersion: string;
-    disclaimer: string;
-    offerCode: string;
-    version: string;
-    publicationDate: string;
-    products: Record<string, any>;
-    terms: {
-        OnDemand?: Record<string, any>;
-        Reserved?: Record<string, any>;
-    };
-}
+/**
+ * Safe number parsing with validation
+ */
+export function parsePrice(value: any): number {
+    const parsed = parseFloat(value);
 
-export interface NormalizedPricing {
-    service: string;
-    region: string;
-    currency: string;
-    version: string;
-    lastUpdated: string;
-    [key: string]: any;
+    if (isNaN(parsed)) {
+        throw new Error(`Invalid price value: ${value}`);
+    }
+
+    if (parsed < 0) {
+        throw new Error(`Negative price not allowed: ${parsed}`);
+    }
+
+    return parsed;
 }
 
 /**
- * Extract region from AWS location string
+ * Extract region from location string
  */
 export function normalizeRegion(location: string): string {
     const regionMap: Record<string, string> = {
@@ -42,58 +37,52 @@ export function normalizeRegion(location: string): string {
         "Asia Pacific (Singapore)": "ap-southeast-1",
         "Asia Pacific (Sydney)": "ap-southeast-2",
         "Asia Pacific (Mumbai)": "ap-south-1",
-        "South America (Sao Paulo)": "sa-east-1",
         "Canada (Central)": "ca-central-1",
+        "South America (São Paulo)": "sa-east-1"
     };
 
-    return regionMap[location] || location;
-}
-
-/**
- * Safe number parsing with validation
- */
-export function parsePrice(value: string | number): number {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-
-    if (isNaN(num) || !isFinite(num)) {
-        throw new Error(`Invalid price value: ${value}`);
+    const region = regionMap[location];
+    if (!region) {
+        throw new Error(`Unknown location: ${location}`);
     }
 
-    return num;
+    return region;
 }
 
 /**
  * Generate ISO timestamp
  */
-export function getCurrentTimestamp(): string {
+export function getTimestamp(): string {
     return new Date().toISOString();
 }
 
 /**
- * Validate no AWS-specific field names in output
+ * Validate no AWS field names in output
  */
-export function validateNoAWSFields(obj: any, path: string = ""): void {
-    const forbiddenPatterns = [
+export function validateNoAWSFields(obj: any, path: string = "root"): void {
+    const awsFieldPatterns = [
         /sku/i,
         /offerTermCode/i,
         /rateCode/i,
         /termAttributes/i,
-        /pricePerUnit/i,
+        /pricePerUnit/i
     ];
 
-    for (const [key, value] of Object.entries(obj)) {
-        const currentPath = path ? `${path}.${key}` : key;
+    for (const key in obj) {
+        const fullPath = `${path}.${key}`;
 
-        for (const pattern of forbiddenPatterns) {
-            if (pattern.test(key)) {
-                throw new Error(
-                    `Forbidden AWS field name found: ${currentPath}`
-                );
-            }
+        // Check if key matches AWS patterns
+        const isAWSField = awsFieldPatterns.some(pattern => pattern.test(key));
+        if (isAWSField) {
+            throw new Error(
+                `AWS field name detected in output: ${fullPath}. ` +
+                `Use normalized field names only.`
+            );
         }
 
-        if (value && typeof value === "object") {
-            validateNoAWSFields(value, currentPath);
+        // Recurse into nested objects
+        if (typeof obj[key] === "object" && obj[key] !== null) {
+            validateNoAWSFields(obj[key], fullPath);
         }
     }
 }

@@ -1,86 +1,108 @@
 /**
- * Schema validation for normalized pricing
+ * Pricing Validation
+ * Validates normalized pricing output against strict schema
  */
 
-import { NormalizedPricing } from "../normalize/common.js";
-
-export interface PricingSchema {
-    service: string;
-    region: string;
-    currency: string;
-    version: string;
-    lastUpdated: string;
-    [key: string]: any;
-}
+import { z } from "zod";
 
 /**
- * Validate pricing schema
+ * Base pricing schema - all services must conform
  */
-export function validatePricingSchema(pricing: any): void {
-    // Required fields
-    const requiredFields = ["service", "region", "currency", "version", "lastUpdated"];
+const BasePricingSchema = z.object({
+    service: z.string(),
+    region: z.string(),
+    currency: z.literal("USD"),
+    version: z.string(),
+    lastUpdated: z.string().datetime()
+});
 
-    for (const field of requiredFields) {
-        if (!(field in pricing)) {
-            throw new Error(`Missing required field: ${field}`);
-        }
+/**
+ * EC2 Pricing Schema
+ */
+const EC2InstanceSchema = z.object({
+    vcpu: z.number().positive(),
+    memory_gb: z.number().positive(),
+    network_performance: z.string(),
+    pricing: z.object({
+        type: z.literal("hourly"),
+        rate: z.number().nonnegative()
+    })
+});
 
-        if (typeof pricing[field] !== "string") {
-            throw new Error(`Field ${field} must be a string`);
-        }
-    }
+const EC2PricingSchema = BasePricingSchema.extend({
+    service: z.literal("ec2"),
+    instances: z.record(z.string(), EC2InstanceSchema)
+});
 
-    // Validate timestamp
-    const timestamp = new Date(pricing.lastUpdated);
-    if (isNaN(timestamp.getTime())) {
-        throw new Error(`Invalid timestamp: ${pricing.lastUpdated}`);
-    }
+/**
+ * Validate EC2 pricing output
+ */
+export function validateEC2Pricing(data: any): void {
+    console.log("\n=== Validating EC2 Pricing ===");
 
-    // Validate version format
-    if (!pricing.version.match(/^v\d+$/)) {
-        throw new Error(`Invalid version format: ${pricing.version}`);
-    }
-
-    // Validate currency
-    if (pricing.currency !== "USD") {
-        throw new Error(`Unsupported currency: ${pricing.currency}`);
-    }
-
-    // Ensure JSON serializability
     try {
-        JSON.stringify(pricing);
+        EC2PricingSchema.parse(data);
+        console.log("✓ Schema validation passed");
     } catch (error) {
-        throw new Error("Pricing data is not JSON serializable");
+        console.error("✗ Schema validation failed:");
+        throw error;
     }
+
+    // Additional assertions
+    assertNoPricingAnomalies(data);
+    assertNoAWSFieldNames(data);
+
+    console.log("✓ All validation checks passed");
 }
 
 /**
- * Validate no NaN, null, undefined in pricing values
+ * Assert no NaN, null, undefined in pricing
  */
-export function validatePricingValues(obj: any, path: string = ""): void {
-    for (const [key, value] of Object.entries(obj)) {
-        const currentPath = path ? `${path}.${key}` : key;
+function assertNoPricingAnomalies(data: any): void {
+    const instances = data.instances || {};
 
-        if (value === null) {
-            throw new Error(`Null value found at: ${currentPath}`);
+    for (const [type, instance] of Object.entries(instances)) {
+        const inst = instance as any;
+
+        if (isNaN(inst.pricing.rate)) {
+            throw new Error(`NaN rate for instance ${type}`);
         }
 
-        if (value === undefined) {
-            throw new Error(`Undefined value found at: ${currentPath}`);
+        if (inst.pricing.rate === null || inst.pricing.rate === undefined) {
+            throw new Error(`Null/undefined rate for instance ${type}`);
         }
 
-        if (typeof value === "number") {
-            if (isNaN(value)) {
-                throw new Error(`NaN found at: ${currentPath}`);
-            }
-
-            if (!isFinite(value)) {
-                throw new Error(`Infinite value found at: ${currentPath}`);
-            }
-        }
-
-        if (value && typeof value === "object") {
-            validatePricingValues(value, currentPath);
+        if (inst.pricing.rate < 0) {
+            throw new Error(`Negative rate for instance ${type}: ${inst.pricing.rate}`);
         }
     }
+
+    console.log("✓ No pricing anomalies detected");
+}
+
+/**
+ * Assert no AWS field names in output
+ */
+function assertNoAWSFieldNames(data: any): void {
+    const awsFields = [
+        "sku",
+        "offerTermCode",
+        "rateCode",
+        "termAttributes",
+        "pricePerUnit",
+        "priceDimensions"
+    ];
+
+    const jsonStr = JSON.stringify(data);
+
+    for (const field of awsFields) {
+        if (jsonStr.includes(field)) {
+            throw new Error(
+                `AWS field name detected in output: "${field}". ` +
+                `Use normalized field names only.`
+            );
+        }
+    }
+
+    console.log("✓ No AWS field names in output");
 }

@@ -1,58 +1,65 @@
 /**
- * Unit normalization for AWS pricing
+ * Unit Normalization
+ * Maps AWS pricing units to strict, calculator-ready primitives
  */
 
 export type PricingUnit = "hour" | "gb" | "request" | "transition" | "flat";
 
 /**
- * Map AWS pricing units to normalized primitives
+ * Normalize AWS unit strings to primitive types
+ * FAILS LOUDLY if unit is unmappable - no silent assumptions
  */
 export function normalizeUnit(awsUnit: string): PricingUnit {
     const normalized = awsUnit.toLowerCase().trim();
 
     // Hourly units
-    if (
-        normalized.includes("hrs") ||
-        normalized.includes("hour") ||
-        normalized === "quantity"
-    ) {
+    if (normalized.includes("hour") || normalized.includes("hrs")) {
         return "hour";
     }
 
-    // Storage units
-    if (
-        normalized.includes("gb-mo") ||
-        normalized.includes("gb") ||
-        normalized.includes("gigabyte")
-    ) {
+    // Storage units (GB, TB, etc.)
+    if (normalized.includes("gb") || normalized.includes("gigabyte")) {
         return "gb";
     }
 
-    // Request units
-    if (
-        normalized.includes("request") ||
-        normalized.includes("req")
-    ) {
+    // Request/transaction units
+    if (normalized.includes("request") || normalized.includes("transaction")) {
         return "request";
     }
 
-    // Transition units (lifecycle)
+    // State transitions (S3 lifecycle, etc.)
     if (normalized.includes("transition")) {
         return "transition";
     }
 
-    // Flat/one-time
-    if (normalized.includes("flat") || normalized.includes("one-time")) {
+    // Flat fees
+    if (normalized === "flat" || normalized === "quantity") {
         return "flat";
     }
 
-    throw new Error(`Unable to normalize unit: ${awsUnit}`);
+    // FAIL LOUDLY - no silent fallbacks
+    throw new Error(
+        `UNMAPPABLE UNIT: "${awsUnit}". Add explicit mapping or reject this SKU.`
+    );
 }
 
 /**
- * Validate unit is a known primitive
+ * Convert AWS storage units to GB
  */
-export function isValidUnit(unit: string): unit is PricingUnit {
-    const validUnits: PricingUnit[] = ["hour", "gb", "request", "transition", "flat"];
-    return validUnits.includes(unit as PricingUnit);
+export function normalizeStorageToGB(value: number, unit: string): number {
+    const normalized = unit.toLowerCase().trim();
+
+    if (normalized.includes("tb") || normalized.includes("terabyte")) {
+        return value * 1024;
+    }
+
+    if (normalized.includes("mb") || normalized.includes("megabyte")) {
+        return value / 1024;
+    }
+
+    if (normalized.includes("gb") || normalized.includes("gigabyte")) {
+        return value;
+    }
+
+    throw new Error(`UNMAPPABLE STORAGE UNIT: "${unit}"`);
 }
