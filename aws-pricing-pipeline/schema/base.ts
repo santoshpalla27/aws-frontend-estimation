@@ -49,7 +49,7 @@ export const BaseServicePricing = z.object({
     service: z.string(),
     region: z.string(),
     currency: z.literal('USD'),
-    version: z.string().regex(/^v\d+$/),
+    version: z.string().regex(/^v\d+\.\d+\.\d+$/, 'Version must be in semver format (e.g., v1.0.0)'),
     lastUpdated: z.string().datetime(),
 });
 

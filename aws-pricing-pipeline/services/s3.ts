@@ -76,7 +76,7 @@ export async function processS3(region: string = 'us-east-1'): Promise<S3Service
         service: 's3',
         region,
         currency: 'USD',
-        version: 'v1',
+        version: 'v1.0.0',
         lastUpdated: new Date().toISOString(),
         components: {
             storage: {

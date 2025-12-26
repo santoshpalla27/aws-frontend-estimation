@@ -77,7 +77,7 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
         service: 'ec2',
         region,
         currency: 'USD',
-        version: 'v1',
+        version: 'v1.0.0', // Will be set by versioning system
         lastUpdated: new Date().toISOString(),
         components: {
             instances,

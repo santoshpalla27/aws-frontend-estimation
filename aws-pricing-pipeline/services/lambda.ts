@@ -75,7 +75,7 @@ export async function processLambda(region: string = 'us-east-1'): Promise<Lambd
         service: 'lambda',
         region,
         currency: 'USD',
-        version: 'v1',
+        version: 'v1.0.0',
         lastUpdated: new Date().toISOString(),
         components: {
             compute: {

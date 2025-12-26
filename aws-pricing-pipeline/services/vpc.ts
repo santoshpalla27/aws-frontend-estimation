@@ -87,7 +87,7 @@ export async function processVPC(region: string = 'us-east-1'): Promise<VPCServi
         service: 'vpc',
         region,
         currency: 'USD',
-        version: 'v1',
+        version: 'v1.0.0',
         lastUpdated: new Date().toISOString(),
         components: {
             natGateway: {
