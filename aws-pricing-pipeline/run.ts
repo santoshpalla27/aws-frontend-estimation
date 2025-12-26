@@ -77,12 +77,22 @@ async function main() {
         console.log(chalk.bold.yellow('\n[STEP 5/6] Determining version bump...\n'));
 
         const currentVersion = getCurrentVersion();
-        const maxBumpType = diffs.length > 0
-            ? diffs.reduce((max, d) => {
-                const priority = { major: 3, minor: 2, patch: 1 };
-                return priority[d.bumpType] > priority[max] ? d.bumpType : max;
-            }, 'patch' as const)
-            : 'minor'; // Default to minor for new services
+
+        // Determine the highest priority bump type from all diffs
+        let maxBumpType: 'major' | 'minor' | 'patch' = 'patch';
+
+        if (diffs.length > 0) {
+            const priority: Record<'major' | 'minor' | 'patch', number> = { major: 3, minor: 2, patch: 1 };
+
+            for (const diff of diffs) {
+                if (priority[diff.bumpType] > priority[maxBumpType]) {
+                    maxBumpType = diff.bumpType;
+                }
+            }
+        } else {
+            // Default to minor for new services
+            maxBumpType = 'minor';
+        }
 
         const newVersion = bumpVersion(currentVersion, maxBumpType);
 
