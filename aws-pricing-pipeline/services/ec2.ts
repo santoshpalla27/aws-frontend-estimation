@@ -44,112 +44,268 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
     const stats = fs.statSync(rawFile);
     Logger.data('File size', `${(stats.size / 1024 / 1024).toFixed(2)} MB`);
 
-    // Load and parse (for now, using synchronous read - will optimize later)
-    const rawData: AWSPricingFile = JSON.parse(fs.readFileSync(rawFile, 'utf-8'));
-    Logger.data('Total products', Object.keys(rawData.products).length);
-
     const instances: Record<string, SimpleRate> = {};
     const ebsPricing: any = {};
 
-    // Process products
-    for (const [sku, product] of Object.entries(rawData.products)) {
-        const attrs = product.attributes;
+    Logger.info('Streaming and parsing large JSON file...');
 
-        // Filter by region
-        if (normalizeRegion(attrs.location || '') !== region) {
-            continue;
-        }
+    // Use streaming JSON parser for large files
+    const { default: StreamArray } = await import('stream-json/streamers/StreamArray.js');
+    const { parser } = await import('stream-json');
+    const { chain } = await import('stream-chain');
 
-        // Process EC2 Instances
-        if (product.productFamily === 'Compute Instance') {
-            // Apply SKU filters
-            if (!applySKUFilters(attrs, EC2_FILTERS)) {
-                continue;
-            }
+    return new Promise((resolve, reject) => {
+        let products: Record<string, any> = {};
+        let terms: any = {};
+        let inProducts = false;
+        let inTerms = false;
+        let processedCount = 0;
 
-            const instanceType = attrs.instanceType;
-            if (!instanceType) continue;
+        const pipeline = chain([
+            fs.createReadStream(rawFile),
+            parser(),
+        ]);
 
-            // Get On-Demand pricing
-            const onDemandTerms = rawData.terms.OnDemand[sku];
-            if (!onDemandTerms) continue;
+        pipeline.on('data', (data: any) => {
+            // Parse the JSON structure as it streams
+            if (data.key === 'products' && data.name === 'startObject') {
+                inProducts = true;
+            } else if (data.key === 'terms' && data.name === 'startObject') {
+                inTerms = true;
+                inProducts = false;
+            } else if (inProducts && data.name === 'endKey') {
+                // Store product data
+                if (data.value && typeof data.value === 'object') {
+                    products[data.key] = data.value;
+                    processedCount++;
 
-            for (const term of Object.values(onDemandTerms)) {
-                for (const dimension of Object.values(term.priceDimensions)) {
-                    const rate = parseAwsPrice(dimension.pricePerUnit.USD);
-                    const unit = normalizeUnit(dimension.unit);
-
-                    instances[instanceType] = { rate, unit };
-                    break; // Take first price dimension
+                    if (processedCount % 10000 === 0) {
+                        Logger.info(`Processed ${processedCount} products...`);
+                    }
                 }
+            } else if (inTerms && data.key === 'OnDemand') {
+                terms = { OnDemand: data.value };
             }
-        }
+        });
 
-        // Process EBS Volumes
-        if (product.productFamily === 'Storage') {
-            const volumeType = attrs.volumeApiName;
-            if (!volumeType) continue;
+        pipeline.on('end', () => {
+            Logger.info(`Finished streaming. Processing ${Object.keys(products).length} products...`);
 
-            const onDemandTerms = rawData.terms.OnDemand[sku];
-            if (!onDemandTerms) continue;
+            try {
+                // Process products
+                for (const [sku, product] of Object.entries(products)) {
+                    const attrs = product.attributes || {};
 
-            for (const term of Object.values(onDemandTerms)) {
-                for (const dimension of Object.values(term.priceDimensions)) {
-                    const rate = parseAwsPrice(dimension.pricePerUnit.USD);
-                    const unit = normalizeUnit(dimension.unit);
+                    // Filter by region
+                    try {
+                        if (attrs.location && normalizeRegion(attrs.location) !== region) {
+                            continue;
+                        }
+                    } catch {
+                        continue; // Skip if region normalization fails
+                    }
 
-                    ebsPricing[volumeType] = { rate, unit };
-                    break;
+                    // Process EC2 Instances
+                    if (product.productFamily === 'Compute Instance') {
+                        // Apply SKU filters
+                        if (!applySKUFilters(attrs, EC2_FILTERS)) {
+                            continue;
+                        }
+
+                        const instanceType = attrs.instanceType;
+                        if (!instanceType) continue;
+
+                        // Get On-Demand pricing
+                        const onDemandTerms = terms.OnDemand?.[sku];
+                        if (!onDemandTerms) continue;
+
+                        for (const term of Object.values(onDemandTerms)) {
+                            for (const dimension of Object.values((term as any).priceDimensions || {})) {
+                                const dim = dimension as any;
+                                const rate = parseAwsPrice(dim.pricePerUnit.USD);
+                                const unit = normalizeUnit(dim.unit);
+
+                                instances[instanceType] = { rate, unit };
+                                break; // Take first price dimension
+                            }
+                        }
+                    }
+
+                    // Process EBS Volumes
+                    if (product.productFamily === 'Storage') {
+                        const volumeType = attrs.volumeApiName;
+                        if (!volumeType) continue;
+
+                        const onDemandTerms = terms.OnDemand?.[sku];
+                        if (!onDemandTerms) continue;
+
+                        for (const term of Object.values(onDemandTerms)) {
+                            for (const dimension of Object.values((term as any).priceDimensions || {})) {
+                                const dim = dimension as any;
+                                const rate = parseAwsPrice(dim.pricePerUnit.USD);
+                                const unit = normalizeUnit(dim.unit);
+
+                                ebsPricing[volumeType] = { rate, unit };
+                                break;
+                            }
+                        }
+                    }
                 }
+
+                // Build output
+                const output: EC2ServicePricing = {
+                    service: 'ec2',
+                    region,
+                    currency: 'USD',
+                    version: 'v1', // Will be set by versioning system
+                    lastUpdated: new Date().toISOString(),
+                    components: {
+                        instances,
+                        ebs: {
+                            gp3: ebsPricing['gp3'] || { rate: 0.08, unit: 'gb_month' as const },
+                            gp2: ebsPricing['gp2'] || { rate: 0.10, unit: 'gb_month' as const },
+                            io2: ebsPricing['io2'] || { rate: 0.125, unit: 'gb_month' as const },
+                            io1: ebsPricing['io1'] || { rate: 0.125, unit: 'gb_month' as const },
+                            st1: ebsPricing['st1'] || { rate: 0.045, unit: 'gb_month' as const },
+                            sc1: ebsPricing['sc1'] || { rate: 0.015, unit: 'gb_month' as const },
+                            standard: ebsPricing['standard'] || { rate: 0.05, unit: 'gb_month' as const },
+                        },
+                        snapshots: {
+                            storage: { rate: 0.05, unit: 'gb_month' as const },
+                        },
+                        dataTransfer: {
+                            in: { rate: 0, unit: 'gb' as const },
+                            out: [
+                                { upTo: 10240, rate: 0.09, unit: 'gb' as const },
+                                { upTo: 51200, rate: 0.085, unit: 'gb' as const },
+                                { upTo: 153600, rate: 0.07, unit: 'gb' as const },
+                                { upTo: 'Infinity', rate: 0.05, unit: 'gb' as const },
+                            ],
+                        },
+                        elasticIP: {
+                            idle: { rate: 0.005, unit: 'hour' as const },
+                            additional: { rate: 0.005, unit: 'hour' as const },
+                        },
+                    },
+                };
+
+                Logger.table({
+                    'Instance types': Object.keys(instances).length,
+                    'EBS volume types': Object.keys(ebsPricing).length,
+                    'Region': region,
+                });
+
+                timer.end();
+                Logger.success('EC2 processing complete');
+
+                resolve(output);
+            } catch (error) {
+                reject(error);
             }
-        }
+        });
+
+        pipeline.on('error', (error: Error) => {
+            Logger.error('Streaming error', error);
+            reject(error);
+        });
+    });
+}
+
+// Filter by region
+if (normalizeRegion(attrs.location || '') !== region) {
+    continue;
+}
+
+// Process EC2 Instances
+if (product.productFamily === 'Compute Instance') {
+    // Apply SKU filters
+    if (!applySKUFilters(attrs, EC2_FILTERS)) {
+        continue;
     }
 
-    // Build output
-    const output: EC2ServicePricing = {
-        service: 'ec2',
-        region,
-        currency: 'USD',
-        version: 'v1', // Will be set by versioning system
-        lastUpdated: new Date().toISOString(),
-        components: {
-            instances,
-            ebs: {
-                gp3: ebsPricing['gp3'] || { rate: 0.08, unit: 'gb_month' as const },
-                gp2: ebsPricing['gp2'] || { rate: 0.10, unit: 'gb_month' as const },
-                io2: ebsPricing['io2'] || { rate: 0.125, unit: 'gb_month' as const },
-                io1: ebsPricing['io1'] || { rate: 0.125, unit: 'gb_month' as const },
-                st1: ebsPricing['st1'] || { rate: 0.045, unit: 'gb_month' as const },
-                sc1: ebsPricing['sc1'] || { rate: 0.015, unit: 'gb_month' as const },
-                standard: ebsPricing['standard'] || { rate: 0.05, unit: 'gb_month' as const },
-            },
-            snapshots: {
-                storage: { rate: 0.05, unit: 'gb_month' as const },
-            },
-            dataTransfer: {
-                in: { rate: 0, unit: 'gb' as const },
-                out: [
-                    { upTo: 10240, rate: 0.09, unit: 'gb' as const },
-                    { upTo: 51200, rate: 0.085, unit: 'gb' as const },
-                    { upTo: 153600, rate: 0.07, unit: 'gb' as const },
-                    { upTo: 'Infinity', rate: 0.05, unit: 'gb' as const },
-                ],
-            },
-            elasticIP: {
-                idle: { rate: 0.005, unit: 'hour' as const },
-                additional: { rate: 0.005, unit: 'hour' as const },
-            },
+    const instanceType = attrs.instanceType;
+    if (!instanceType) continue;
+
+    // Get On-Demand pricing
+    const onDemandTerms = rawData.terms.OnDemand[sku];
+    if (!onDemandTerms) continue;
+
+    for (const term of Object.values(onDemandTerms)) {
+        for (const dimension of Object.values(term.priceDimensions)) {
+            const rate = parseAwsPrice(dimension.pricePerUnit.USD);
+            const unit = normalizeUnit(dimension.unit);
+
+            instances[instanceType] = { rate, unit };
+            break; // Take first price dimension
+        }
+    }
+}
+
+// Process EBS Volumes
+if (product.productFamily === 'Storage') {
+    const volumeType = attrs.volumeApiName;
+    if (!volumeType) continue;
+
+    const onDemandTerms = rawData.terms.OnDemand[sku];
+    if (!onDemandTerms) continue;
+
+    for (const term of Object.values(onDemandTerms)) {
+        for (const dimension of Object.values(term.priceDimensions)) {
+            const rate = parseAwsPrice(dimension.pricePerUnit.USD);
+            const unit = normalizeUnit(dimension.unit);
+
+            ebsPricing[volumeType] = { rate, unit };
+            break;
+        }
+    }
+}
+    }
+
+// Build output
+const output: EC2ServicePricing = {
+    service: 'ec2',
+    region,
+    currency: 'USD',
+    version: 'v1', // Will be set by versioning system
+    lastUpdated: new Date().toISOString(),
+    components: {
+        instances,
+        ebs: {
+            gp3: ebsPricing['gp3'] || { rate: 0.08, unit: 'gb_month' as const },
+            gp2: ebsPricing['gp2'] || { rate: 0.10, unit: 'gb_month' as const },
+            io2: ebsPricing['io2'] || { rate: 0.125, unit: 'gb_month' as const },
+            io1: ebsPricing['io1'] || { rate: 0.125, unit: 'gb_month' as const },
+            st1: ebsPricing['st1'] || { rate: 0.045, unit: 'gb_month' as const },
+            sc1: ebsPricing['sc1'] || { rate: 0.015, unit: 'gb_month' as const },
+            standard: ebsPricing['standard'] || { rate: 0.05, unit: 'gb_month' as const },
         },
-    };
+        snapshots: {
+            storage: { rate: 0.05, unit: 'gb_month' as const },
+        },
+        dataTransfer: {
+            in: { rate: 0, unit: 'gb' as const },
+            out: [
+                { upTo: 10240, rate: 0.09, unit: 'gb' as const },
+                { upTo: 51200, rate: 0.085, unit: 'gb' as const },
+                { upTo: 153600, rate: 0.07, unit: 'gb' as const },
+                { upTo: 'Infinity', rate: 0.05, unit: 'gb' as const },
+            ],
+        },
+        elasticIP: {
+            idle: { rate: 0.005, unit: 'hour' as const },
+            additional: { rate: 0.005, unit: 'hour' as const },
+        },
+    },
+};
 
-    Logger.table({
-        'Instance types': Object.keys(instances).length,
-        'EBS volume types': Object.keys(ebsPricing).length,
-        'Region': region,
-    });
+Logger.table({
+    'Instance types': Object.keys(instances).length,
+    'EBS volume types': Object.keys(ebsPricing).length,
+    'Region': region,
+});
 
-    timer.end();
-    Logger.success('EC2 processing complete');
+timer.end();
+Logger.success('EC2 processing complete');
 
-    return output;
+return output;
 }
