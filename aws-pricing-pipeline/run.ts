@@ -97,20 +97,21 @@ async function main() {
         const currentVersion = getCurrentVersion();
 
         // Determine the highest priority bump type from all diffs
-        let maxBumpType: 'major' | 'minor' | 'patch' = 'patch';
+        const maxBumpType: BumpType = diffs.length > 0
+            ? diffs.reduce((max: BumpType, d) => {
+                const priority: Record<BumpType, number> = { major: 3, minor: 2, patch: 1 };
+                return priority[d.bumpType] > priority[max] ? d.bumpType : max;
+            }, 'patch' as BumpType)
+            : 'minor'; // Default to minor for new services
 
-        if (diffs.length > 0) {
-            const priority: Record<'major' | 'minor' | 'patch', number> = { major: 3, minor: 2, patch: 1 };
+        // Find the service that caused the highest bump
+        const causingDiff = diffs.find(d => d.bumpType === maxBumpType) || diffs[0];
 
-            for (const diff of diffs) {
-                if (priority[diff.bumpType] > priority[maxBumpType]) {
-                    maxBumpType = diff.bumpType;
-                }
-            }
-        } else {
-            // Default to minor for new services
-            maxBumpType = 'minor';
-        }
+        const bumpReason = causingDiff ? {
+            service: causingDiff.service,
+            type: causingDiff.bumpType,
+            reason: causingDiff.reason
+        } : undefined;
 
         const newVersion = bumpVersion(currentVersion, maxBumpType);
 
@@ -134,8 +135,8 @@ async function main() {
             console.log(chalk.green(`[WRITE] ${filePath}`));
         }
 
-        // Write metadata
-        writeVersionMetadata(newVersion, versionDir);
+        // Write metadata with bump reason
+        writeVersionMetadata(newVersion, versionDir, bumpReason);
 
         // Write diff report
         const diffReport = generateDiffReport(diffs);

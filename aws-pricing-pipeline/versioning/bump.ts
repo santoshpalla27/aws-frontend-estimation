@@ -179,13 +179,19 @@ function copyDirectory(src: string, dest: string): void {
  */
 export function writeVersionMetadata(
     version: VersionInfo,
-    versionDir: string
+    versionDir: string,
+    bumpReason?: { service: string; type: BumpType; reason: string }
 ): void {
-    const metadata = {
+    const metadata: any = {
         version: version.next,
         createdAt: new Date().toISOString(),
         previousVersion: version.current !== 'v0.0.0' ? version.current : null,
     };
+
+    // Add bump reason if provided
+    if (bumpReason) {
+        metadata.bumpReason = bumpReason;
+    }
 
     const metadataPath = path.join(versionDir, 'metadata.json');
     fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));

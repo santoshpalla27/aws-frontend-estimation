@@ -11,9 +11,10 @@ import chalk from 'chalk';
 export type BumpType = 'major' | 'minor' | 'patch';
 
 export interface DiffResult {
+    service: string;
     bumpType: BumpType;
+    reason: string;
     changes: ChangeRecord[];
-    summary: string;
 }
 
 export interface ChangeRecord {
@@ -39,21 +40,31 @@ export function diffPricing(
     const diff = deepDiff(oldData, newData, serviceName);
     changes.push(...diff.changes);
 
-    // Determine bump type
+    // Determine bump type and reason
     const hasSchemaChange = changes.some(c => c.changeType === 'schema');
     const hasPricingChange = changes.some(c => c.changeType === 'pricing');
 
+    let reason: string;
+
     if (hasSchemaChange) {
         bumpType = 'major';
+        const schemaChanges = changes.filter(c => c.changeType === 'schema');
+        reason = `Schema change: ${schemaChanges[0]?.path || 'structure modified'}`;
     } else if (hasPricingChange) {
         bumpType = 'minor';
+        const pricingChanges = changes.filter(c => c.changeType === 'pricing');
+        reason = `Pricing change: ${pricingChanges[0]?.path || 'rates modified'}`;
     } else {
         bumpType = 'patch';
+        reason = 'Metadata update (lastUpdated, version, etc.)';
     }
 
-    const summary = `${serviceName}: ${changes.length} change(s) detected (${bumpType} bump)`;
-
-    return { bumpType, changes, summary };
+    return {
+        service: serviceName,
+        bumpType,
+        reason,
+        changes
+    };
 }
 
 /**
@@ -162,10 +173,13 @@ export function generateDiffReport(diffs: DiffResult[]): string {
     if (majorChanges.length > 0) {
         lines.push('## Major Changes (Schema)\n');
         majorChanges.forEach(d => {
-            lines.push(`- ${d.summary}`);
-            d.changes.forEach(c => {
-                lines.push(`  - ${c.path}: ${c.oldValue} → ${c.newValue}`);
+            lines.push(`- ${d.service}: ${d.reason}`);
+            d.changes.slice(0, 5).forEach(c => {
+                lines.push(`  - ${c.path}: ${JSON.stringify(c.oldValue)} → ${JSON.stringify(c.newValue)}`);
             });
+            if (d.changes.length > 5) {
+                lines.push(`  - ... and ${d.changes.length - 5} more changes`);
+            }
         });
         lines.push('');
     }
@@ -173,7 +187,7 @@ export function generateDiffReport(diffs: DiffResult[]): string {
     if (minorChanges.length > 0) {
         lines.push('## Minor Changes (Pricing)\n');
         minorChanges.forEach(d => {
-            lines.push(`- ${d.summary}`);
+            lines.push(`- ${d.service}: ${d.reason}`);
         });
         lines.push('');
     }
@@ -181,7 +195,7 @@ export function generateDiffReport(diffs: DiffResult[]): string {
     if (patchChanges.length > 0) {
         lines.push('## Patch Changes (Metadata)\n');
         patchChanges.forEach(d => {
-            lines.push(`- ${d.summary}`);
+            lines.push(`- ${d.service}: ${d.reason}`);
         });
         lines.push('');
     }
