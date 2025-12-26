@@ -1,0 +1,28 @@
+{
+  "name": "aws-pricing-pipeline",
+  "version": "1.0.0",
+  "description": "AWS pricing data ingestion and normalization pipeline",
+  "main": "run.ts",
+  "scripts": {
+    "update-pricing": "node --max-old-space-size=4096 --no-warnings --loader tsx run.ts",
+    "pricing-diff": "tsx tools/pricing-diff.ts",
+    "test": "vitest",
+    "build": "tsc"
+  },
+  "keywords": [
+    "aws",
+    "pricing",
+    "cost-estimation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  }
+}

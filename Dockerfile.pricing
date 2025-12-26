@@ -1,0 +1,21 @@
+# Pricing Pipeline Dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY pricing-pipeline/package*.json ./
+RUN npm ci
+
+# Copy pricing pipeline code
+COPY pricing-pipeline/ ./
+
+# Create output directory
+RUN mkdir -p /app/output
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=4096
+
+# Run pricing pipeline
+CMD ["npm", "run", "update-pricing"]
