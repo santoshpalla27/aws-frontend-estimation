@@ -54,16 +54,17 @@ export async function examplePrivateSubnetArchitecture() {
     );
 
     // Calculate costs
-    const breakdown = calculator.getBreakdown(graph);
+    const breakdown = await calculator.getBreakdown(graph);
 
     // Display results
     console.log("=".repeat(60));
-    console.log("Cost Breakdown");
+    console.log("AWS Cost Estimation - Private Subnet Architecture");
     console.log("=".repeat(60));
     console.log();
 
-    for (const [service, items] of breakdown.byService) {
-        const serviceTotal = items.reduce((sum, item) => sum + item.cost, 0);
+    // Group by service
+    for (const [service, items] of breakdown.byService.entries()) {
+        const serviceTotal = items.reduce((sum: number, item: CostLineItem) => sum + item.cost, 0);
         console.log(`${service.toUpperCase()}: $${serviceTotal.toFixed(2)}/month`);
 
         for (const item of items) {
