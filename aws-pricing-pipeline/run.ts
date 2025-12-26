@@ -8,6 +8,8 @@ import { getEnabledServices } from './registry/service-registry.js';
 import { assertServiceParity } from './validate/parity.js';
 import { validatePricingData } from './validate/validate.js';
 import { deepSortObject } from './utils/deterministic.js';
+import { readManifest } from './fetch/manifest.js';
+import { ServiceStateTracker } from './utils/service-state.js';
 import { EC2ServicePricing } from './schema/ec2.schema.js';
 import { S3ServicePricing } from './schema/s3.schema.js';
 import { LambdaServicePricing } from './schema/lambda.schema.js';
@@ -29,10 +31,25 @@ async function main() {
     console.log(chalk.bold.cyan('╚════════════════════════════════════════╝\n'));
 
     try {
+        // Initialize service state tracker
+        const stateTracker = new ServiceStateTracker();
+
         // Step 1: Fetch raw pricing data
         console.log(chalk.bold.yellow('\n[STEP 1/6] Fetching AWS pricing data...\n'));
         const fetchedServices = await fetchAll();
         console.log(chalk.green(`✓ Fetched ${fetchedServices.length} services: ${fetchedServices.join(', ')}\n`));
+
+        // Validate download manifest
+        const manifest = readManifest();
+        console.log(chalk.blue(`[MANIFEST] Downloaded: ${manifest.downloaded.length} services`));
+        console.log(chalk.blue(`[MANIFEST] Failed: ${manifest.failed.length} services`));
+
+        if (manifest.failed.length > 0) {
+            throw new Error(`Download validation failed. See manifest for details.`);
+        }
+
+        // Mark all downloaded services
+        fetchedServices.forEach(service => stateTracker.markDownloaded(service));
 
         // Step 2: Process services from registry
         console.log(chalk.bold.yellow('\n[STEP 2/6] Processing services...\n'));
@@ -46,6 +63,9 @@ async function main() {
             const data = await service.processor(region);
             serviceDataMap.set(service.code, data);
             processedServices.push(service.code);
+
+            // Mark as normalized
+            stateTracker.markNormalized(service.code);
         }
 
         // Step 2.5: CRITICAL - Validate service parity
@@ -68,9 +88,12 @@ async function main() {
             if (schema) {
                 const serviceName = enabledServices.find(s => s.code === code)?.name || code;
                 validatePricingData(data, schema, serviceName);
+                console.log(chalk.green(`✓ ${serviceName} validated`));
+
+                // Mark as validated
+                stateTracker.markValidated(code);
             }
         }
-
         // Step 4: Diff against previous version
         console.log(chalk.bold.yellow('\n[STEP 4/6] Computing diffs...\n'));
 
@@ -137,6 +160,12 @@ async function main() {
 
             fs.writeFileSync(filePath, JSON.stringify(sorted, null, 2));
             console.log(chalk.green(`[WRITE] ${filePath}`));
+
+            // Mark as output
+            const serviceCode = enabledServices.find(s => s.name.toLowerCase() === service.name)?.code;
+            if (serviceCode) {
+                stateTracker.markOutput(serviceCode);
+            }
         }
 
         // Write metadata with bump reason
@@ -151,8 +180,20 @@ async function main() {
         // Update latest pointer
         updateLatestPointer(newVersion);
 
-        // Success!
-        console.log(chalk.bold.green('\n✓ Pipeline completed successfully!\n'));
+        // Mark all services as versioned
+        for (const service of services) {
+            const serviceCode = enabledServices.find(s => s.name.toLowerCase() === service.name)?.code;
+            if (serviceCode) {
+                stateTracker.markVersioned(serviceCode);
+            }
+        }
+
+        // Validate all services reached VERSIONED state
+        stateTracker.validateAllVersioned();
+
+        const summary = stateTracker.getSummary();
+        console.log(chalk.bold.green(`\n✓ Pipeline completed successfully!`));
+        console.log(chalk.green(`✓ ${summary.versioned}/${summary.total} services fully supported\n`));
         console.log(chalk.green(`Version: ${newVersion.next}`));
         console.log(chalk.green(`Output: output/aws/${newVersion.next}/`));
         console.log(chalk.green(`Services: ${services.length}`));
