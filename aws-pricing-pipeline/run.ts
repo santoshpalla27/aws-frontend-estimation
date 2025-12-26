@@ -7,6 +7,7 @@ import { fetchAll } from './fetch/index.js';
 import { getEnabledServices } from './registry/service-registry.js';
 import { assertServiceParity } from './validate/parity.js';
 import { validatePricingData } from './validate/validate.js';
+import { deepSortObject } from './utils/deterministic.js';
 import { EC2ServicePricing } from './schema/ec2.schema.js';
 import { S3ServicePricing } from './schema/s3.schema.js';
 import { LambdaServicePricing } from './schema/lambda.schema.js';
@@ -121,7 +122,7 @@ async function main() {
         const versionDir = createVersionDirectory(newVersion);
         const servicesDir = path.join(versionDir, 'services');
 
-        // Write service files
+        // Write service files with deterministic output
         for (const service of services) {
             const filePath = path.join(servicesDir, `${service.name}.json`);
 
@@ -131,7 +132,10 @@ async function main() {
                 version: newVersion.next,
             };
 
-            fs.writeFileSync(filePath, JSON.stringify(dataWithVersion, null, 2));
+            // Sort keys recursively for deterministic output
+            const sorted = deepSortObject(dataWithVersion);
+
+            fs.writeFileSync(filePath, JSON.stringify(sorted, null, 2));
             console.log(chalk.green(`[WRITE] ${filePath}`));
         }
 
