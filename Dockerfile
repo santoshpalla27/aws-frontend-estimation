@@ -23,14 +23,13 @@ RUN npm ci
 
 # Copy source code
 COPY src/ ./src/
-COPY public/ ./public/ 2>/dev/null || true
 COPY index.html ./
 COPY vite.config.ts ./
 COPY tsconfig.json ./
 COPY tsconfig.node.json ./
 
 # Copy pricing data from pricing-builder
-COPY --from=pricing-builder /app/pricing-pipeline/output ./public/pricing
+COPY --from=pricing-builder /app/pricing-pipeline/output/ ./public/pricing/
 
 # Build frontend
 RUN npm run build
@@ -42,7 +41,7 @@ FROM nginx:alpine
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 
 # Copy pricing data
-COPY --from=pricing-builder /app/pricing-pipeline/output /usr/share/nginx/html/pricing
+COPY --from=pricing-builder /app/pricing-pipeline/output/ /usr/share/nginx/html/pricing/
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
