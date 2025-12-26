@@ -35,11 +35,6 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
 
     Logger.info('Streaming and parsing large JSON file...');
 
-    // Use streaming JSON parser for large files
-    const { parser } = await import('stream-json');
-    const { chain } = await import('stream-chain');
-    const { streamObject } = await import('stream-json/streamers/StreamObject.js');
-
     return new Promise((resolve, reject) => {
         const products: Record<string, any> = {};
         let terms: any = null;
