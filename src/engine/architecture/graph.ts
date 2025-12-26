@@ -3,7 +3,7 @@
  * Manages architecture nodes with dependency and conflict validation
  */
 
-import { ArchitectureNode } from "../types";
+import { ArchitectureNode } from "../types.ts";
 
 export class ArchitectureGraph {
     private nodes: Map<string, ArchitectureNode> = new Map();
@@ -208,3 +208,4 @@ export class ArchitectureGraph {
         return result;
     }
 }
+

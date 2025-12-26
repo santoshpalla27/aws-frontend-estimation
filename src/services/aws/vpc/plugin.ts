@@ -3,11 +3,11 @@
  * Handles VPC, NAT Gateway, and Internet Gateway costs
  */
 
-import { ArchitectureNode, GlobalContext, CostLineItem } from "../../core/types";
-import { PricingPrimitives } from "../../core/primitives";
-import { ArchitectureGraph } from "../../engine/architecture/graph";
-import { BaseServicePlugin } from "../plugin";
-import { pricingLoader } from "../../engine/pricing/loader";
+import { ArchitectureNode, GlobalContext, CostLineItem } from "../../core/types.ts";
+import { PricingPrimitives } from "../../core/primitives.ts";
+import { ArchitectureGraph } from "../../engine/architecture/graph.ts";
+import { BaseServicePlugin } from "../plugin.ts";
+import { pricingLoader } from "../../engine/pricing/loader.ts";
 
 export interface VPCConfig {
     cidr: string;
@@ -195,3 +195,4 @@ export class VPCPlugin extends BaseServicePlugin {
         return costs;
     }
 }
+
