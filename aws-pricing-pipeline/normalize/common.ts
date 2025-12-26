@@ -18,6 +18,7 @@ const REGION_MAP: Record<string, string> = {
     'Asia Pacific (Sydney)': 'ap-southeast-2',
     'Asia Pacific (Mumbai)': 'ap-south-1',
     'Canada (Central)': 'ca-central-1',
+    'Canada West (Calgary)': 'ca-west-1',
     'South America (São Paulo)': 'sa-east-1',
 };
 
