@@ -1,4 +1,3 @@
-```json
 {
     "name": "aws-cost-engine",
     "version": "1.0.0",
@@ -9,7 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "type-check": "tsc --noEmit",
-        "test": "vitest"
+        "test": "vite{"
     },
     "dependencies": {
         "react": "^18.2.0",
