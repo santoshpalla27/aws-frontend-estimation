@@ -8,7 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "type-check": "tsc --noEmit",
-        "test": "vite{"
+        "test": "vitest"
     },
     "dependencies": {
         "react": "^18.2.0",
