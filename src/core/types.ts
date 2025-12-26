@@ -71,4 +71,3 @@ export const DEFAULT_CONTEXT: GlobalContext = {
     pricingVersion: "v1",
     hoursPerMonth: 730, // 365 days / 12 months * 24 hours
 };
-

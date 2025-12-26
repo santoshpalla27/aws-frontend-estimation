@@ -3,11 +3,11 @@
  * Handles EC2 instance cost calculations
  */
 
-import { ArchitectureNode, GlobalContext, CostLineItem } from "../../core/types.ts";
-import { PricingPrimitives } from "../../core/primitives.ts";
-import { ArchitectureGraph } from "../../engine/architecture/graph.ts";
-import { BaseServicePlugin } from "../plugin.ts";
-import { pricingLoader } from "../../engine/pricing/loader.ts";
+import { ArchitectureNode, GlobalContext, CostLineItem } from "../../core/types";
+import { PricingPrimitives } from "../../core/primitives";
+import { ArchitectureGraph } from "../../engine/architecture/graph";
+import { BaseServicePlugin } from "../plugin";
+import { pricingLoader } from "../../engine/pricing/loader";
 
 export interface EC2Config {
     instanceType: string;
@@ -110,4 +110,3 @@ export class EC2Plugin extends BaseServicePlugin {
         return costs;
     }
 }
-

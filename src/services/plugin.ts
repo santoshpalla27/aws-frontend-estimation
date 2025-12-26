@@ -3,9 +3,9 @@
  * All service implementations must implement this interface
  */
 
-import { ArchitectureNode } from "../core/types.ts";
-import { GlobalContext, CostLineItem } from "../core/types.ts";
-import { ArchitectureGraph } from "../engine/architecture/graph.ts";
+import { ArchitectureNode } from "../core/types";
+import { GlobalContext, CostLineItem } from "../core/types";
+import { ArchitectureGraph } from "../engine/architecture/graph";
 
 export interface CloudServicePlugin {
     /**
@@ -94,4 +94,3 @@ export abstract class BaseServicePlugin implements CloudServicePlugin {
         }
     }
 }
-

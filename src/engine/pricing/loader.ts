@@ -71,4 +71,3 @@ export class PricingLoader {
  * Global pricing loader instance
  */
 export const pricingLoader = new PricingLoader();
-

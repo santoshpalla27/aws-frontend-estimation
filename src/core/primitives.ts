@@ -3,7 +3,7 @@
  * All temporal logic is centralized through GlobalContext
  */
 
-import { GlobalContext, PricingTier, PricingUnit } from "./types.ts";
+import { GlobalContext, PricingTier, PricingUnit } from "./types";
 
 export class PricingPrimitives {
     /**
@@ -105,4 +105,3 @@ export class PricingPrimitives {
         }
     }
 }
-

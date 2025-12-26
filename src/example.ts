@@ -3,12 +3,12 @@
  * Demonstrates how to create an architecture and calculate costs
  */
 
-import { ArchitectureGraph } from "./engine/architecture/graph.ts";
-import { CostCalculator } from "./engine/calculator/engine.ts";
-import { DEFAULT_CONTEXT, CostLineItem } from "./core/types.ts";
-import { EC2Plugin } from "./services/aws/ec2/plugin.ts";
-import { VPCPlugin } from "./services/aws/vpc/plugin.ts";
-import { pricingLoader } from "./engine/pricing/loader.ts";
+import { ArchitectureGraph } from "./engine/architecture/graph";
+import { CostCalculator } from "./engine/calculator/engine";
+import { DEFAULT_CONTEXT, CostLineItem } from "./core/types";
+import { EC2Plugin } from "./services/aws/ec2/plugin";
+import { VPCPlugin } from "./services/aws/vpc/plugin";
+import { pricingLoader } from "./engine/pricing/loader";
 
 /**
  * Example: Private subnet with NAT Gateway and EC2 instance
@@ -85,4 +85,3 @@ export async function examplePrivateSubnetArchitecture() {
 
 // Export for use in other modules
 export { ArchitectureGraph, CostCalculator, EC2Plugin, VPCPlugin };
-

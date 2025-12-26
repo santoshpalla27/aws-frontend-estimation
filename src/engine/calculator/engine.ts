@@ -3,9 +3,9 @@
  * Orchestrates cost calculations across all service plugins
  */
 
-import { GlobalContext, CostLineItem, CostBreakdown } from "../core/types.ts";
-import { ArchitectureGraph } from "./architecture/graph.ts";
-import { CloudServicePlugin } from "../services/plugin.ts";
+import { GlobalContext, CostLineItem, CostBreakdown } from "../core/types";
+import { ArchitectureGraph } from "./architecture/graph";
+import { CloudServicePlugin } from "../services/plugin";
 
 export class CostCalculator {
     constructor(
@@ -132,4 +132,3 @@ export class CostCalculator {
         return { ...this.context };
     }
 }
-
