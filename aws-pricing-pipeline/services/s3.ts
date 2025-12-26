@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { S3ServicePricing } from '../schema/s3.schema.js';
+import { SimpleRate, PricingTier } from '../schema/base.js';
 import { normalizeUnit, parseAwsPrice } from '../normalize/units.js';
-import { normalizeRegion } from '../normalize/common.js';
+import { normalizeRegion, assertSingleRegion } from '../normalize/common.js';
 
 /**
  * S3 Pricing Processor
@@ -125,6 +126,8 @@ export async function processS3(region: string = 'us-east-1'): Promise<S3Service
     };
 
     console.log(chalk.green(`[S3] Processed S3 pricing successfully`));
+    // CRITICAL: Validate exactly one region
+    assertSingleRegion(output, region);
 
     return output;
 }

@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { LambdaServicePricing } from '../schema/lambda.schema.js';
-import { parseAwsPrice } from '../normalize/units.js';
+import { SimpleRate } from '../schema/base.js';
+import { parseAwsPrice, assertSingleRegion } from '../normalize/common.js';
 
 /**
  * Lambda Pricing Processor
@@ -89,6 +90,11 @@ export async function processLambda(region: string = 'us-east-1'): Promise<Lambd
             },
         },
     };
+
+    console.log(`[Lambda] Processed ${Object.keys(output.components.compute).length} compute tiers`);
+
+    // CRITICAL: Validate exactly one region
+    assertSingleRegion(output, region);
 
     console.log(chalk.green(`[Lambda] Processed Lambda pricing successfully`));
 

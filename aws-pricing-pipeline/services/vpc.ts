@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { VPCServicePricing } from '../schema/vpc.schema.js';
-import { parseAwsPrice } from '../normalize/units.js';
+import { SimpleRate } from '../schema/base.js';
+import { parseAwsPrice, assertSingleRegion } from '../normalize/common.js';
 
 /**
  * VPC Pricing Processor
@@ -21,7 +22,7 @@ interface AWSPricingFile {
                 unit: string;
                 pricePerUnit: { USD: string };
             }>;
-        }>>;
+        }>;
     };
 }
 
@@ -111,6 +112,11 @@ export async function processVPC(region: string = 'us-east-1'): Promise<VPCServi
             },
         },
     };
+
+    console.log(`[VPC] Processed ${Object.keys(output.components.natGateway).length} NAT Gateway tiers`);
+
+    // CRITICAL: Validate exactly one region
+    assertSingleRegion(output, region);
 
     console.log(chalk.green(`[VPC] Processed VPC pricing successfully`));
 

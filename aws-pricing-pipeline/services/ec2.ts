@@ -3,6 +3,7 @@ import path from 'path';
 import { Logger, Timer } from '../utils/logger.js';
 import { EC2ServicePricing } from '../schema/ec2.schema.js';
 import { SimpleRate } from '../schema/base.js';
+import { assertSingleRegion } from '../normalize/common.js';
 
 /**
  * EC2 Pricing Processor
@@ -117,6 +118,9 @@ export async function processEC2(region: string = 'us-east-1'): Promise<EC2Servi
 
     timer.end();
     Logger.success('EC2 processing complete (fallback mode)');
+
+    // CRITICAL: Validate exactly one region
+    assertSingleRegion(output, region);
 
     return output;
 }

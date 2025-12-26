@@ -49,41 +49,67 @@ export function validateCurrency(currency: string): void {
 }
 
 /**
- * Extract numeric value from AWS attribute
- * Handles strings like "8 vCPU", "32 GB", etc.
+ * Extract numeric value from string
  */
-export function extractNumericValue(value: string): number | null {
-    const match = value.match(/^(\d+(?:\.\d+)?)/);
+export function extractNumeric(value: string): number {
+    const match = value.match(/[\d.]+/);
     if (!match) {
-        return null;
+        throw new Error(`[NUMERIC EXTRACTION FAILED] Could not extract number from: "${value}"`);
     }
-    return parseFloat(match[1]!);
+    return parseFloat(match[0]!);
 }
 
 /**
  * Safe JSON parse with error context
  */
-export function safeJSONParse<T>(json: string, context: string): T {
+export function safeJsonParse<T>(json: string, context: string): T {
     try {
         return JSON.parse(json) as T;
     } catch (error) {
-        throw new Error(`[JSON PARSE FAILED] ${context}: ${error}`);
+        throw new Error(
+            `[JSON PARSE FAILED] ${context}: ${error instanceof Error ? error.message : String(error)}`
+        );
     }
 }
 
 /**
  * Validate required fields exist
  */
-export function validateRequiredFields(
-    obj: Record<string, unknown>,
-    fields: string[],
-    context: string
-): void {
+export function validateRequiredFields(obj: Record<string, any>, fields: string[], context: string): void {
     for (const field of fields) {
         if (!(field in obj) || obj[field] === undefined || obj[field] === null) {
-            throw new Error(
-                `[VALIDATION FAILED] ${context}: Missing required field "${field}"`
-            );
+            throw new Error(`[VALIDATION FAILED] ${context}: Missing required field "${field}"`);
         }
     }
+}
+
+/**
+ * Assert that pricing data contains exactly one region
+ * CRITICAL: Prevents cross-region pricing contamination
+ * 
+ * @param data - Pricing data object with region field
+ * @param expectedRegion - The region that should be present
+ * @throws Error if zero regions or multiple regions detected
+ */
+export function assertSingleRegion(data: { region: string }, expectedRegion: string): void {
+    const actualRegion = data.region;
+
+    // Check if region is missing
+    if (!actualRegion) {
+        throw new Error(
+            `[REGION VALIDATION FAILED] No region found in pricing data. ` +
+            `Expected: "${expectedRegion}"`
+        );
+    }
+
+    // Check if region matches expected
+    if (actualRegion !== expectedRegion) {
+        throw new Error(
+            `[REGION VALIDATION FAILED] Region mismatch detected. ` +
+            `Expected: "${expectedRegion}", Found: "${actualRegion}". ` +
+            `This indicates cross-region pricing contamination.`
+        );
+    }
+
+    // Success - exactly one region and it matches
 }
